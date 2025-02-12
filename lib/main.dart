@@ -138,6 +138,12 @@ class _WebViewExampleState extends State<WebViewExample> {
 
     final WebViewController controller =
         WebViewController.fromPlatformCreationParams(params);
+
+    if (controller.platform is WebKitWebViewController) {
+      final wkWebViewController =
+          controller.platform as WebKitWebViewController;
+      wkWebViewController.setInspectable(true); // Enable Safari Web Inspector
+    }
     // #enddocregion platform_features
 
     // Check and update on first load
@@ -148,14 +154,14 @@ class _WebViewExampleState extends State<WebViewExample> {
       if (isOnline) {
         controller
             .runJavaScriptReturningResult(
-                "window.connectivity = 'online'; window.connectivity;")
+                "window.connectivity = 'online'; alert('connectivity is online'); window.connectivity;")
             .then((value) {
-          print('#cntvt Run js done (online) - Result: $value');
+          print('#cntvt Run js done (honline) - Result: $value');
         });
       } else {
         controller
             .runJavaScriptReturningResult(
-                "window.connectivity = 'offline'; window.connectivity;")
+                "window.connectivity = 'offline';alert('connectivity is offline'); window.connectivity;")
             .then((value) {
           print('#cntvt Run js done (offline) - Result $value');
         });
@@ -169,13 +175,15 @@ class _WebViewExampleState extends State<WebViewExample> {
       print("#cntvt On changed connectivity: $isOnline");
       if (isOnline) {
         controller
-            .runJavaScript("window.connectivity = 'online';")
+            .runJavaScript(
+                "window.connectivity = 'online';alert('connectivity is online');")
             .then((value) {
           print('#cntvt Run js done (online)');
         });
       } else {
         controller
-            .runJavaScript("window.connectivity = 'offline';")
+            .runJavaScript(
+                "window.connectivity = 'offline';alert('connectivity is offline');")
             .then((value) {
           print('#cntvt Run js done (offline)');
         });
