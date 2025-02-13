@@ -120,10 +120,14 @@ class WebViewExample extends StatefulWidget {
 
 class _WebViewExampleState extends State<WebViewExample> {
   late final WebViewController _controller;
+  String _connectivityStatus = 'online';
+  var isWebViewLoaded = false;
+  final Connectivity _connectivity = Connectivity();
 
   @override
   void initState() {
     super.initState();
+    _initConnectivity();
 
     // #docregion platform_features
     late final PlatformWebViewControllerCreationParams params;
@@ -146,50 +150,6 @@ class _WebViewExampleState extends State<WebViewExample> {
     }
     // #enddocregion platform_features
 
-    // Check and update on first load
-    Connectivity().checkConnectivity().then((connectivityResult) {
-      bool isOnline = connectivityResult.contains(ConnectivityResult.wifi) ||
-          connectivityResult.contains(ConnectivityResult.mobile);
-      print("#cntvt Initial connectivity: $isOnline");
-      if (isOnline) {
-        controller
-            .runJavaScriptReturningResult(
-                "window.connectivity = 'online'; alert('connectivity is online'); window.connectivity;")
-            .then((value) {
-          print('#cntvt Run js done (honline) - Result: $value');
-        });
-      } else {
-        controller
-            .runJavaScriptReturningResult(
-                "window.connectivity = 'offline';alert('connectivity is offline'); window.connectivity;")
-            .then((value) {
-          print('#cntvt Run js done (offline) - Result $value');
-        });
-      }
-    });
-
-    // Listen on connectivity changes and update
-    Connectivity().onConnectivityChanged.listen((result) async {
-      final isOnline = result.contains(ConnectivityResult.wifi) ||
-          result.contains(ConnectivityResult.mobile);
-      print("#cntvt On changed connectivity: $isOnline");
-      if (isOnline) {
-        controller
-            .runJavaScript(
-                "window.connectivity = 'online';alert('connectivity is online');")
-            .then((value) {
-          print('#cntvt Run js done (online)');
-        });
-      } else {
-        controller
-            .runJavaScript(
-                "window.connectivity = 'offline';alert('connectivity is offline');")
-            .then((value) {
-          print('#cntvt Run js done (offline)');
-        });
-      }
-    });
-
     controller
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setNavigationDelegate(
@@ -202,6 +162,8 @@ class _WebViewExampleState extends State<WebViewExample> {
           },
           onPageFinished: (String url) {
             debugPrint('Page finished loading: $url');
+            isWebViewLoaded = true;
+            _sendConnectivityStatus();
           },
           onWebResourceError: (WebResourceError error) {
             debugPrint('''
@@ -240,8 +202,56 @@ Page resource error:
         },
       )
       // ..runJavaScript("window.isOffline = true;")
-      ..loadRequest(Uri.parse('https://spos.sandbox-1.teko.vn/warehouse'))
-      ..runJavaScript("window.test = 'test';");
+      ..loadRequest(Uri.parse('https://spos.sandbox-2.teko.vn/warehouse'));
+
+    // Check and update on first load
+    // Connectivity().checkConnectivity().then((connectivityResult) {
+    //   bool isOnline = connectivityResult.contains(ConnectivityResult.wifi) ||
+    //       connectivityResult.contains(ConnectivityResult.mobile);
+    //   print("#cntvt Initial connectivity: $isOnline");
+    //   if (isOnline) {
+    //     controller
+    //         .runJavaScriptReturningResult(
+    //             "window.connectivity = 'online'; alert('connectivity is online: ' + window.location); window.connectivity;")
+    //         .then((value) {
+    //       print('#cntvt Run js done (honline) - Result: $value');
+    //     });
+    //   } else {
+    //     controller
+    //         .runJavaScriptReturningResult(
+    //             "window.connectivity = 'offline';alert('connectivity is offline: ' + window.location); window.connectivity;")
+    //         .then((value) {
+    //       print('#cntvt Run js done (offline) - Result $value');
+    //     });
+    //   }
+    // });
+
+    // Listen on connectivity changes and update
+    Connectivity().onConnectivityChanged.listen((result) async {
+      _updateConnectionStatus(result);
+      // Update connectivity status only when webview is fully loaded
+      if (isWebViewLoaded) {
+        _sendConnectivityStatus();
+      }
+      // final isOnline = result.contains(ConnectivityResult.wifi) ||
+      //     result.contains(ConnectivityResult.mobile);
+      // print("#cntvt On changed connectivity: $isOnline");
+      // if (isOnline) {
+      //   controller
+      //       .runJavaScript(
+      //           "window.connectivity = 'online';alert('connectivity is online: ' + window.location);")
+      //       .then((value) {
+      //     print('#cntvt Run js done (online)');
+      //   });
+      // } else {
+      //   controller
+      //       .runJavaScript(
+      //           "window.connectivity = 'offline';alert('connectivity is offline: '+ window.location);")
+      //       .then((value) {
+      //     print('#cntvt Run js done (offline)');
+      //   });
+      // }
+    });
 
     // setBackgroundColor is not currently supported on macOS.
     if (kIsWeb || !Platform.isMacOS) {
@@ -257,6 +267,37 @@ Page resource error:
     // #enddocregion platform_features
 
     _controller = controller;
+  }
+
+  Future<void> _initConnectivity() async {
+    List<ConnectivityResult> result = [ConnectivityResult.none];
+    try {
+      result = await _connectivity.checkConnectivity();
+    } catch (e) {
+      print(e.toString());
+    }
+
+    if (!mounted) {
+      return Future.value(null);
+    }
+
+    return _updateConnectionStatus(result);
+  }
+
+  Future<void> _updateConnectionStatus(List<ConnectivityResult> result) async {
+    String status = 'offline';
+    if (result.contains(ConnectivityResult.wifi) ||
+        result.contains(ConnectivityResult.mobile)) {
+      status = 'online';
+    }
+    setState(() {
+      _connectivityStatus = status;
+    });
+  }
+
+  void _sendConnectivityStatus() {
+    _controller.runJavaScript(
+        'window.connectivity = `$_connectivityStatus`; alert(`Connectivity: $_connectivityStatus`)'); // Target origin can be more specific
   }
 
   @override
